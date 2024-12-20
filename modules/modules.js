@@ -9,22 +9,23 @@ const User = sequelize.define("user", {
 });
 const Model = sequelize.define("model", {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-  height: { type: DataTypes.STRING, unique: true },
+  height: { type: DataTypes.STRING },
   shoeSize: { type: DataTypes.FLOAT },
   gender: { type: DataTypes.STRING, defaultValue: "Man" },
-  FI: { type: DataTypes.STRING },
+  FI: { type: DataTypes.STRING, unique: true },
   age: { type: DataTypes.INTEGER, defaultValue: 3 },
 });
-const Image = sequelize.define("image-list", {
+const ImageList = sequelize.define("image-list", {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  URL: { type: DataTypes.STRING },
   model_id: { type: DataTypes.INTEGER, allowNull: false },
 });
 
-Model.hasMany(Image, { foreignKey: "model_id" });
-Image.belongsTo(Model, { foreignKey: "model_id" });
+Model.hasMany(ImageList, { foreignKey: "model_id" });
+ImageList.belongsTo(Model, { foreignKey: "model_id" });
 
 module.exports = {
   User,
   Model,
-  Image,
+  ImageList,
 };
