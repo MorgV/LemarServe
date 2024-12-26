@@ -14,6 +14,7 @@ const Model = sequelize.define("model", {
   gender: { type: DataTypes.STRING, defaultValue: "Man" },
   FI: { type: DataTypes.STRING, unique: true },
   age: { type: DataTypes.INTEGER, defaultValue: 3 },
+  imageProfile: { type: DataTypes.STRING },
 });
 const ImageList = sequelize.define("image-list", {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
