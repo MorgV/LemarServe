@@ -119,8 +119,9 @@ class ModelController {
   }
   async getOne(req, res) {
     try {
-      const { id } = req.body;
+      const { id } = req.params;
       console.log(id);
+      console.log("afssssssssssssssssssssssssssssssss");
       const record = await Model.findOne({
         where: {
           id: id,
