@@ -133,15 +133,6 @@ class ModelController {
       console.error("Error finding record:", error);
     }
   } //может не работать
-  async uploudFile(req, res) {
-    try {
-      const file = req.files.file;
-      console.log(file);
-      // const parent = await ImageList.findOne()
-    } catch (error) {
-      return res.status(500).json({ message: "Upload error" });
-    }
-  }
-}
+
 
 module.exports = new ModelController();
