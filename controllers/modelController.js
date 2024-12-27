@@ -114,11 +114,10 @@ class ModelController {
   } //может не работать
 
   async getAll(req, res) {
-    //
     const models = await Model.findAll();
     return res.json(models);
   }
-  async findOne(req, res) {
+  async getOne(req, res) {
     try {
       const { id } = req.body;
       console.log(id);
