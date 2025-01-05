@@ -17,7 +17,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.resolve(__dirname, "static")));
 app.use(fileUpload({}));
-app.use("/Lemar", router); // < = Роутинг авторизации и тд
+app.use("/", router); // < = Роутинг авторизации и тд
 
 //Обработка ошибок в конце
 app.use(errorHandler);

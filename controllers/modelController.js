@@ -1,8 +1,6 @@
 const { Model, ImageList } = require("../modules/modules");
 const uuid = require("uuid");
 const path = require("path");
-
-const { message } = require("statuses");
 const { Op } = require("sequelize");
 
 class ModelController {
@@ -114,6 +112,26 @@ class ModelController {
     }
   } //может не работать
 
+  async deleteModel(req, res) {
+    const { id } = req.params; // ID модели, которую нужно обновить
+    try {
+      const result = await Model.destroy({
+        where: {
+          id: id, // Указываем условие для удаления записи по ID
+        },
+      });
+
+      // Проверяем, сколько записей было удалено
+      if (result === 0) {
+        return { status: "not_found", message: "Запись не найдена." }; // Если записи не найдены
+      } else {
+        return { status: "success", message: "Запись успешно удалена." }; // Если запись удалена
+      }
+    } catch (error) {
+      console.error("Ошибка при удалении записи:", error);
+      return { status: "error", message: "Ошибка при удалении записи." }; // Ошибка
+    }
+  }
   async getAll(req, res) {
     const {
       page = 1,
@@ -157,21 +175,28 @@ class ModelController {
       res.status(500).json({ message: "Internal server error" });
     }
   }
-  async getOne(req, res) {
+  async getImages(req, res) {
     try {
       const { id } = req.params;
       console.log(id);
-      console.log("afssssssssssssssssssssssssssssssss");
-      const record = await Model.findOne({
+      console.log("Fetching images for model");
+
+      // Поиск изображений по идентификатору модели
+      const images = await ImageList.findAll({
         where: {
-          id: id,
+          model_id: id, // Предположим, что в таблице ImageList есть поле modelId, которое связано с моделью
         },
+        attributes: ["URL"], // Выбираем только нужные поля
       });
 
-      return record ? res.json(record) : null;
+      // Если изображения найдены, возвращаем их
+      return images.length
+        ? res.json(images)
+        : res.status(404).json({ message: "Images not found" });
     } catch (error) {
-      console.error("Error finding record:", error);
+      console.error("Error fetching images:", error);
+      res.status(500).json({ message: "Server error" });
     }
-  } //может не работать
+  }
 }
 module.exports = new ModelController();
