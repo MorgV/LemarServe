@@ -3,6 +3,7 @@ const uuid = require("uuid");
 const path = require("path");
 
 const { message } = require("statuses");
+const { Op } = require("sequelize");
 
 class ModelController {
   async createModel(req, res) {
@@ -114,8 +115,47 @@ class ModelController {
   } //может не работать
 
   async getAll(req, res) {
-    const models = await Model.findAll();
-    return res.json(models);
+    const {
+      page = 1,
+      perPage = 5,
+      search = "",
+      sortBy = "id",
+      sortDirection = "asc",
+    } = req.query.params;
+    console.log(req.query.params);
+    try {
+      // Формирование условий поиска
+      const searchCondition = search
+        ? {
+            [Op.or]: [
+              { FI: { [Op.like]: `%${search}%` } },
+              { gender: { [Op.like]: `%${search}%` } },
+              // { shoeSize: { [Op.like]: `%${search}%` } },
+              // { height: { [Op.like]: `%${search}%` } },
+              // { age: { [Op.like]: `%${search}%` } },
+            ],
+          }
+        : {};
+
+      // Запрос с использованием Sequelize
+      const result = await Model.findAndCountAll({
+        where: searchCondition,
+        order: [[sortBy, sortDirection.toUpperCase()]],
+        limit: parseInt(perPage),
+        offset: (page - 1) * perPage,
+      });
+
+      // Формирование ответа
+      res.json({
+        total: result.count,
+        page: Number(page),
+        perPage: Number(perPage),
+        models: result.rows,
+      });
+    } catch (error) {
+      console.error("Error fetching models:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
   }
   async getOne(req, res) {
     try {
@@ -133,6 +173,5 @@ class ModelController {
       console.error("Error finding record:", error);
     }
   } //может не работать
-
-
+}
 module.exports = new ModelController();
