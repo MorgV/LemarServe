@@ -2,18 +2,28 @@ const { Model, ImageList } = require("../modules/modules");
 const uuid = require("uuid");
 const path = require("path");
 const { Op } = require("sequelize");
+const fs = require("fs");
 
 class ModelController {
   async createModel(req, res) {
+    console.log("createModelLLLLLLLLLLLLLLLL");
+
     try {
       const { height, shoeSize, gender, firstName, age, imgCount } = req.body;
+      console.log(req.body, req.files);
+
+      if (!imgCount) {
+        throw new Error("Не указано количество изображений");
+      }
 
       const { imageProfile } = req.files;
+
       let imageProfileName = uuid.v4() + ".jpg";
       imageProfile.mv(
         path.resolve(__dirname, "..", "static", imageProfileName)
       );
       console.log(imageProfile, imageProfileName);
+
       const model = await Model.create({
         height,
         shoeSize,
@@ -22,23 +32,47 @@ class ModelController {
         age,
         imageProfile: imageProfileName,
       });
-      // Создание Images
 
+      // Создание Images
       for (let i = 0; i < imgCount; i++) {
         const image = req.files[`images[${i}]`];
+        if (!image) {
+          throw new Error(`Изображение с индексом ${i} не найдено`);
+        }
+
         let imageName = uuid.v4() + ".jpg";
         image.mv(path.resolve(__dirname, "..", "static", imageName));
 
-        let imgPath = req.files[`images[${i}]`].filename;
         await ImageList.create({ URL: imageName, model_id: model.id });
+        // await addImagesToImageList(req.files, imgCount, model.id);
       }
 
       return res.json({ model });
     } catch (error) {
       console.log(error.message);
+      return res.status(500).json({ error: error.message });
     }
   }
+  async addImagesToImageList(files, imgCount, modelId) {
+    try {
+      for (let i = 0; i < imgCount; i++) {
+        const image = files[`images[${i}]`];
+        if (!image) {
+          throw new Error(`Изображение с индексом ${i} не найдено`);
+        }
+
+        let imageName = uuid.v4() + ".jpg";
+        image.mv(path.resolve(__dirname, "..", "static", imageName));
+
+        await ImageList.create({ URL: imageName, model_id: modelId });
+      }
+    } catch (error) {
+      throw new Error(`Ошибка при добавлении изображений: ${error.message}`);
+    }
+  }
+
   async updateModel(req, res) {
+    console.log("UPDATEEEEEEEE");
     try {
       const { id } = req.params; // ID модели, которую нужно обновить
       const { height, shoeSize, gender, firstName, age, imgCount } = req.body;
@@ -113,25 +147,42 @@ class ModelController {
   } //может не работать
 
   async deleteModel(req, res) {
-    const { id } = req.params; // ID модели, которую нужно обновить
+    const { id } = req.params; // Получаем ID из параметров
+    console.log("Attempting to delete model with ID:", id);
+
     try {
       const result = await Model.destroy({
         where: {
-          id: id, // Указываем условие для удаления записи по ID
+          id: id, // Условие для удаления по ID
         },
       });
 
-      // Проверяем, сколько записей было удалено
       if (result === 0) {
-        return { status: "not_found", message: "Запись не найдена." }; // Если записи не найдены
-      } else {
-        return { status: "success", message: "Запись успешно удалена." }; // Если запись удалена
+        // Если запись не найдена
+        console.warn(`Model with ID ${id} not found.`);
+        return res.status(404).json({
+          status: "not_found",
+          message: "Запись не найдена.",
+        });
       }
+
+      // Если запись успешно удалена
+      console.log(`Model with ID ${id} successfully deleted.`);
+      return res.status(200).json({
+        status: "success",
+        message: "Запись успешно удалена.",
+      });
     } catch (error) {
-      console.error("Ошибка при удалении записи:", error);
-      return { status: "error", message: "Ошибка при удалении записи." }; // Ошибка
+      // Обработка ошибок
+      console.log("OSHIBKAAAAAAAAAAAAAAA");
+      console.error(`Error deleting model with ID ${id}:`, error);
+      return res.status(500).json({
+        status: "error",
+        message: "Ошибка при удалении записи.",
+      });
     }
   }
+
   async getAll(req, res) {
     const {
       page = 1,
@@ -140,7 +191,7 @@ class ModelController {
       sortBy = "id",
       sortDirection = "asc",
     } = req.query.params;
-    console.log(req.query.params);
+    console.log(req.query.params, page, perPage, search, sortBy, sortDirection);
     try {
       // Формирование условий поиска
       const searchCondition = search
@@ -175,27 +226,49 @@ class ModelController {
       res.status(500).json({ message: "Internal server error" });
     }
   }
+
   async getImages(req, res) {
     try {
-      const { id } = req.params;
-      console.log(id);
-      console.log("Fetching images for model");
+      const { id } = req.params; // Извлекаем ID модели из параметров запроса.
+      console.log(`Получение модели и изображений для ID: ${id}`);
 
-      // Поиск изображений по идентификатору модели
-      const images = await ImageList.findAll({
-        where: {
-          model_id: id, // Предположим, что в таблице ImageList есть поле modelId, которое связано с моделью
-        },
-        attributes: ["URL"], // Выбираем только нужные поля
+      // Находим модель по ID с включением связанных изображений.
+      const model = await Model.findByPk(id, {
+        include: [
+          {
+            model: ImageList, // Указываем связанную модель ImageList
+            attributes: ["id", "URL"], // Извлекаем только нужные поля
+          },
+        ],
       });
 
-      // Если изображения найдены, возвращаем их
-      return images.length
-        ? res.json(images)
-        : res.status(404).json({ message: "Images not found" });
+      // Если модель не найдена, возвращаем 404.
+      if (!model) {
+        return res.status(404).json({ message: "Модель не найдена" });
+      }
+
+      // Формируем массив изображений.
+      const images = model["image-lists"].map((image) => ({
+        id: image.id,
+        URL: image.URL,
+      }));
+
+      // Возвращаем данные модели и изображения.
+      return res.status(200).json({
+        model: {
+          id: model.id,
+          height: model.height,
+          shoeSize: model.shoeSize,
+          gender: model.gender,
+          FI: model.FI,
+          age: model.age,
+          imageProfile: model.imageProfile,
+        },
+        images,
+      });
     } catch (error) {
-      console.error("Error fetching images:", error);
-      res.status(500).json({ message: "Server error" });
+      console.error("Ошибка при получении модели и изображений:", error);
+      res.status(500).json({ message: "Ошибка сервера" });
     }
   }
 }
