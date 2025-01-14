@@ -75,7 +75,17 @@ class ModelController {
     console.log("UPDATEEEEEEEE");
     try {
       const { id } = req.params; // ID модели, которую нужно обновить
-      const { height, shoeSize, gender, firstName, age, imgCount } = req.body;
+      const {
+        height,
+        shoeSize,
+        gender,
+        firstName,
+        age,
+        imgCount,
+        deleteImageIdArray,
+      } = req.body;
+      console.log(req.files, req.body);
+      // console.log(height, shoeSize, gender, firstName, age, imgCount);
 
       // Поиск модели по ID
       const model = await Model.findByPk(id);
@@ -90,6 +100,7 @@ class ModelController {
       if (firstName !== undefined) model.FI = firstName;
       if (age !== undefined) model.age = age;
 
+      console.log(req.files);
       // Обновление фото профиля, если предоставлено
       if (req.files && req.files.imageProfile) {
         const { imageProfile } = req.files;
@@ -97,6 +108,7 @@ class ModelController {
         imageProfile.mv(
           path.resolve(__dirname, "..", "static", imageProfileName)
         );
+        //mb ne rabotaet
 
         // Удалить старый файл профиля, если требуется
         const oldProfilePath = path.resolve(
@@ -115,28 +127,43 @@ class ModelController {
       await model.save();
 
       // Обновление изображений, если предоставлены
-      if (imgCount) {
-        // Удаляем старые изображения модели из базы данных и файловой системы
+      if (deleteImageIdArray) {
         const oldImages = await ImageList.findAll({
           where: { model_id: model.id },
         });
-        for (const img of oldImages) {
-          const imgPath = path.resolve(__dirname, "..", "static", img.URL);
-          if (fs.existsSync(imgPath)) {
-            fs.unlinkSync(imgPath);
-          }
-          await img.destroy();
-        }
+        let deleteImageIdArrayOnServe = JSON.parse(req.body.deleteImageIdArray);
+        console.log(deleteImageIdArrayOnServe);
+        oldImages.map((el) => {
+          deleteImageIdArrayOnServe.map(async (id) => {
+            console.log("id:", id);
+            if (el.id == id) {
+              console.log("el:", el, "el.id:", el.id);
+              const imgPath = path.resolve(__dirname, "..", "static", el.URL);
+              if (fs.existsSync(imgPath)) {
+                fs.unlinkSync(imgPath);
+              }
+              await el.destroy();
+            }
+          });
+        });
+      }
 
-        // Добавляем новые изображения
+      if (req.files) {
         for (let i = 0; i < imgCount; i++) {
           const image = req.files[`images[${i}]`];
+          if (!image) {
+            throw new Error(`Изображение с индексом ${i} не найдено`);
+          }
+
           let imageName = uuid.v4() + ".jpg";
           image.mv(path.resolve(__dirname, "..", "static", imageName));
+
           await ImageList.create({ URL: imageName, model_id: model.id });
+          // await addImagesToImageList(req.files, imgCount, model.id);
         }
       }
 
+      console.log("Update end");
       return res.json({ model });
     } catch (error) {
       console.log(error.message);
@@ -227,7 +254,7 @@ class ModelController {
     }
   }
 
-  async getImages(req, res) {
+  async getModel(req, res) {
     try {
       const { id } = req.params; // Извлекаем ID модели из параметров запроса.
       console.log(`Получение модели и изображений для ID: ${id}`);
@@ -250,7 +277,7 @@ class ModelController {
       // Формируем массив изображений.
       const images = model["image-lists"].map((image) => ({
         id: image.id,
-        URL: image.URL,
+        URL: `${process.env.REACT_APP_API_URL}${image.URL}`,
       }));
 
       // Возвращаем данные модели и изображения.
