@@ -298,5 +298,46 @@ class ModelController {
       res.status(500).json({ message: "Ошибка сервера" });
     }
   }
+  async getAllSummary(req, res) {
+    const {
+      page = 1,
+      perPage = 5,
+      search = "",
+      sortBy = "id",
+      sortDirection = "asc",
+    } = req.query.params;
+    console.log(req.query.params, page, perPage, search, sortBy, sortDirection);
+    try {
+      // Формирование условий поиска
+      const searchCondition = search
+        ? {
+            [Op.or]: [
+              { FI: { [Op.like]: `%${search}%` } },
+              { gender: { [Op.like]: `%${search}%` } },
+            ],
+          }
+        : {};
+
+      // Запрос с использованием Sequelize
+      const result = await Model.findAndCountAll({
+        where: searchCondition,
+        attributes: ["id", "height", "FI", "age", "imageProfile"], // Извлекаем только нужные поля
+        order: [[sortBy, sortDirection.toUpperCase()]],
+        limit: parseInt(perPage, 10),
+        offset: (page - 1) * perPage,
+      });
+
+      // Формирование ответа
+      res.json({
+        total: result.count,
+        page: Number(page),
+        perPage: Number(perPage),
+        models: result.rows, // Только нужные поля
+      });
+    } catch (error) {
+      console.error("Ошибка при получении моделей:", error);
+      res.status(500).json({ message: "Ошибка сервера" });
+    }
+  }
 }
 module.exports = new ModelController();
