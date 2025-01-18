@@ -122,6 +122,20 @@ class ModelController {
         }
 
         model.imageProfile = imageProfileName;
+      } else if (req.body && req.body.imageProfile) {
+        // Удалить старый файл профиля, если требуется
+        const oldProfilePath = path.resolve(
+          __dirname,
+          "..",
+          "static",
+          model.imageProfile
+        );
+        if (fs.existsSync(oldProfilePath)) {
+          fs.unlinkSync(oldProfilePath);
+        }
+        const lastPart = path.basename(req.body.imageProfile);
+        console.log(lastPart);
+        model.imageProfile = lastPart;
       }
 
       await model.save();
@@ -280,6 +294,11 @@ class ModelController {
         URL: `${process.env.REACT_APP_API_URL}${image.URL}`,
       }));
 
+      // Проверяем значение imageProfile
+      const imageProfile = isValidURL(model.imageProfile)
+        ? model.imageProfile
+        : `${process.env.REACT_APP_API_URL}${model.imageProfile}`;
+
       // Возвращаем данные модели и изображения.
       return res.status(200).json({
         model: {
@@ -289,7 +308,7 @@ class ModelController {
           gender: model.gender,
           FI: model.FI,
           age: model.age,
-          imageProfile: model.imageProfile,
+          imageProfile, // Используем проверенное значение
         },
         images,
       });
@@ -298,6 +317,7 @@ class ModelController {
       res.status(500).json({ message: "Ошибка сервера" });
     }
   }
+
   async getAllSummary(req, res) {
     const {
       page = 1,
@@ -338,6 +358,15 @@ class ModelController {
       console.error("Ошибка при получении моделей:", error);
       res.status(500).json({ message: "Ошибка сервера" });
     }
+  }
+}
+// Функция проверки валидности URL
+function isValidURL(string) {
+  try {
+    new URL(string);
+    return true;
+  } catch (_) {
+    return false;
   }
 }
 module.exports = new ModelController();
