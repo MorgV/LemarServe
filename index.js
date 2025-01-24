@@ -20,6 +20,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(fileUpload({}));
 app.use("/", router); // < = Роутинг авторизации и тд
 
+// app.use(express.static(path.resolve(__dirname, "client", "dist")));
+
 //Обработка ошибок в конце
 app.use(errorHandler);
 
