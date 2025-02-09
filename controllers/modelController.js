@@ -1,8 +1,9 @@
 const { Model, ImageList } = require("../modules/modules");
 const uuid = require("uuid");
 const path = require("path");
-const { Op } = require("sequelize");
+const { QueryTypes, Op } = require("sequelize");
 const fs = require("fs");
+const sequelize = require("../db");
 
 class ModelController {
   async createModel(req, res) {
@@ -361,37 +362,83 @@ class ModelController {
     const {
       page = 1,
       perPage = 5,
-      search = "",
+      search = "", // Получаем значение поиска
       sortBy = "id",
       sortDirection = "asc",
-    } = req.query.params;
-    console.log(req.query.params, page, perPage, search, sortBy, sortDirection);
+      gender,
+      filters = "{}", // Делаем фильтры строкой JSON
+    } = req.query;
+
+    console.log("Request Params: ", req.query);
+
     try {
-      // Формирование условий поиска
+      // Парсим фильтры
+      const parsedFilters = JSON.parse(filters);
+
+      // Условие для поиска по строкам (FI, gender)
       const searchCondition = search
         ? {
             [Op.or]: [
-              { FI: { [Op.like]: `%${search}%` } },
-              { gender: { [Op.like]: `%${search}%` } },
+              { FI: { [Op.like]: `%${search}%` } }, // Ищем по фамилии (FI)
+              { gender: { [Op.like]: `%${search}%` } }, // Ищем по полу
             ],
           }
-        : {};
+        : {}; // Если нет поиска, то условие пустое
 
-      // Запрос с использованием Sequelize
-      const result = await Model.findAndCountAll({
-        where: searchCondition,
-        attributes: ["id", "height", "FI", "age", "imageProfile"], // Извлекаем только нужные поля
-        order: [[sortBy, sortDirection.toUpperCase()]],
-        limit: parseInt(perPage, 10),
-        offset: (page - 1) * perPage,
+      // Условие для фильтрации по полу, если он передан
+      const genderCondition = gender
+        ? { gender: gender === "male" ? "Мужской" : "Женский" }
+        : {}; // Фильтруем по полу
+
+      // Условия для диапазонов (включая высоту, размер обуви и возраст)
+      const rangeConditions = Object.entries(parsedFilters).reduce(
+        (acc, [key, ranges]) => {
+          if (ranges && ranges.length > 0) {
+            acc[key] = {
+              [Op.or]: ranges.map((range) => {
+                if (range.includes("-")) {
+                  const [min, max] = range.split("-").map(Number);
+                  return {
+                    [Op.and]: [{ [Op.gte]: min }, { [Op.lte]: max }], // Диапазон
+                  };
+                } else {
+                  return { [Op.eq]: Number(range) }; // Конкретное значение
+                }
+              }),
+            };
+          }
+          return acc;
+        },
+        {}
+      );
+
+      // Объединяем все условия
+      const finalConditions = {
+        ...searchCondition, // Условие для поиска по строкам
+        ...genderCondition, // Условие для фильтрации по полу
+        ...rangeConditions, // Условия для фильтрации по диапазонам
+      };
+
+      // Запрос для подсчета общего числа моделей
+      const countResult = await Model.count({
+        where: finalConditions,
       });
 
-      // Формирование ответа
+      // Получение моделей с фильтрацией, пагинацией и сортировкой
+      const result = await Model.findAll({
+        where: finalConditions,
+        attributes: ["id", "height", "FI", "age", "imageProfile", "gender"],
+        order: [[sortBy, sortDirection.toUpperCase()]], // Сортировка
+        limit: parseInt(perPage, 10), // Пагинация
+        offset: (page - 1) * perPage, // Смещение для пагинации
+      });
+
+      // Возвращаем результат
       res.json({
-        total: result.count,
+        total: countResult,
         page: Number(page),
         perPage: Number(perPage),
-        models: result.rows, // Только нужные поля
+        models: result,
       });
     } catch (error) {
       console.error("Ошибка при получении моделей:", error);

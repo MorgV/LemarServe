@@ -9,7 +9,7 @@ const User = sequelize.define("user", {
 });
 const Model = sequelize.define("model", {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-  height: { type: DataTypes.STRING },
+  height: { type: DataTypes.INTEGER },
   shoeSize: { type: DataTypes.FLOAT },
   gender: { type: DataTypes.STRING, defaultValue: "Man" },
   FI: { type: DataTypes.STRING, unique: true },
